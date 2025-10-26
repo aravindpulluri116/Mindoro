@@ -13,7 +13,23 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        poppins: ['Poppins', 'sans-serif'],
+      },
       colors: {
+        pomodoro: {
+          DEFAULT: 'hsl(var(--pomodoro-bg))',
+          dark: 'hsl(var(--pomodoro-dark))',
+          light: 'hsl(var(--pomodoro-light))',
+        },
+        'short-break': {
+          DEFAULT: 'hsl(var(--short-break-bg))',
+          dark: 'hsl(var(--short-break-dark))',
+        },
+        'long-break': {
+          DEFAULT: 'hsl(var(--long-break-bg))',
+          dark: 'hsl(var(--long-break-dark))',
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
