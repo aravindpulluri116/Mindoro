@@ -128,21 +128,6 @@ const TaskList = () => {
           </Button>
         )}
 
-        {/* Placeholder for future integrations */}
-        {tasks.length === 0 && !isAdding && (
-          <div className="mt-6 pt-6 border-t border-white/20">
-            <p className="text-white/50 text-xs text-center">
-              🔗 Future: Sync with Google Tasks, Notion & Calendar
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Placeholder for streak tracking */}
-      <div className="mt-4 text-center">
-        <p className="text-white/40 text-sm">
-          🔥 Streak tracking coming soon
-        </p>
       </div>
     </motion.div>
   );

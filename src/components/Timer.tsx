@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { useTimer, TimerMode } from '@/context/TimerContext';
 import { Button } from '@/components/ui/button';
+import MotivationalQuote from './MotivationalQuote';
 
 const Timer = () => {
   const { mode, setMode, timeLeft, isRunning, startTimer, pauseTimer, resetTimer } = useTimer();
@@ -107,12 +108,8 @@ const Timer = () => {
           </motion.button>
         </div>
 
-        {/* Placeholder for future AI motivational quote */}
-        <div className="mt-8 pt-6 border-t border-white/20">
-          <p className="text-white/60 text-sm text-center italic">
-            💡 AI motivational quotes coming soon
-          </p>
-        </div>
+        {/* AI Motivational Quote */}
+        <MotivationalQuote />
       </div>
     </motion.div>
   );

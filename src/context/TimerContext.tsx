@@ -8,6 +8,13 @@ export interface Task {
   completed: boolean;
 }
 
+export interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletionDate: string | null;
+  totalSessions: number;
+}
+
 interface TimerContextType {
   mode: TimerMode;
   setMode: (mode: TimerMode) => void;
@@ -20,6 +27,8 @@ interface TimerContextType {
   addTask: (text: string) => void;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
+  streak: StreakData;
+  updateStreak: () => void;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -48,6 +57,16 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [streak, setStreak] = useState<StreakData>(() => {
+    const saved = localStorage.getItem('streak');
+    return saved ? JSON.parse(saved) : {
+      currentStreak: 0,
+      longestStreak: 0,
+      lastCompletionDate: null,
+      totalSessions: 0,
+    };
+  });
+
   const setMode = useCallback((newMode: TimerMode) => {
     setModeState(newMode);
     setTimeLeft(MODE_DURATIONS[newMode]);
@@ -67,6 +86,10 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [tasks]);
 
   useEffect(() => {
+    localStorage.setItem('streak', JSON.stringify(streak));
+  }, [streak]);
+
+  useEffect(() => {
     document.body.className = `${mode}-mode`;
   }, [mode]);
 
@@ -79,6 +102,10 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (prev <= 1) {
             setIsRunning(false);
             playNotificationSound();
+            // Update streak only for completed pomodoro sessions
+            if (mode === 'pomodoro') {
+              updateStreak();
+            }
             return 0;
           }
           return prev - 1;
@@ -97,6 +124,39 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Handle autoplay restrictions
     });
   };
+
+  const updateStreak = useCallback(() => {
+    const today = new Date().toDateString();
+    const lastDate = streak.lastCompletionDate ? new Date(streak.lastCompletionDate).toDateString() : null;
+    
+    if (lastDate === today) {
+      // Already completed today
+      return;
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
+
+    let newStreak = streak.currentStreak;
+    
+    if (lastDate === yesterdayStr) {
+      // Consecutive day
+      newStreak += 1;
+    } else if (lastDate === null || lastDate !== today) {
+      // First time or streak broken
+      newStreak = 1;
+    }
+
+    const newStreakData: StreakData = {
+      currentStreak: newStreak,
+      longestStreak: Math.max(newStreak, streak.longestStreak),
+      lastCompletionDate: today,
+      totalSessions: streak.totalSessions + 1,
+    };
+
+    setStreak(newStreakData);
+  }, [streak]);
 
   const startTimer = useCallback(() => {
     setIsRunning(true);
@@ -146,6 +206,8 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addTask,
         toggleTask,
         deleteTask,
+        streak,
+        updateStreak,
       }}
     >
       {children}
