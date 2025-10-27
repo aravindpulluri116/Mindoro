@@ -1,11 +1,11 @@
 import { motion } from 'framer-motion';
-import { Play, Pause, RotateCcw } from 'lucide-react';
+import { Play, Pause, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
 import { useTimer, TimerMode } from '@/context/TimerContext';
 import { Button } from '@/components/ui/button';
 import MotivationalQuote from './MotivationalQuote';
 
 const Timer = () => {
-  const { mode, setMode, timeLeft, isRunning, startTimer, pauseTimer, resetTimer } = useTimer();
+  const { mode, setMode, timeLeft, isRunning, startTimer, pauseTimer, resetTimer, incrementTime, decrementTime } = useTimer();
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -35,6 +35,17 @@ const Timer = () => {
     }
   };
 
+  const getModeColor = () => {
+    switch (mode) {
+      case 'pomodoro':
+        return '#D95550'; // Red-orange
+      case 'shortBreak':
+        return '#69CEE5'; // Light blue
+      case 'longBreak':
+        return '#5577C0'; // Darker blue
+    }
+  };
+
   const modes: TimerMode[] = ['pomodoro', 'shortBreak', 'longBreak'];
 
   return (
@@ -42,7 +53,7 @@ const Timer = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="w-full max-w-lg mx-auto"
+      className="w-full lg:min-w-[600px]"
     >
       <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 shadow-lg">
         {/* Mode Toggle */}
@@ -71,9 +82,35 @@ const Timer = () => {
           animate={{ scale: 1 }}
           className="text-center mb-8"
         >
-          <div className="text-8xl font-bold text-white mb-4 font-poppins">
+          {/* Main Timer */}
+          <div className="text-9xl font-bold text-white font-poppins">
             {formatTime(timeLeft)}
           </div>
+          
+          {/* Arrow Controls - Below Timer */}
+          <div className="flex items-center justify-center gap-2 mt-2 mb-3">
+            <motion.button
+              whileHover={{ scale: 1.2 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={decrementTime}
+              disabled={isRunning}
+              className="p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Decrease time"
+            >
+              <ChevronDown className="w-6 h-6" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.2 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={incrementTime}
+              disabled={isRunning}
+              className="p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Increase time"
+            >
+              <ChevronUp className="w-6 h-6" />
+            </motion.button>
+          </div>
+          
           <p className="text-white/90 text-lg font-medium">{getModeMessage()}</p>
         </motion.div>
 
@@ -82,7 +119,8 @@ const Timer = () => {
           <Button
             onClick={isRunning ? pauseTimer : startTimer}
             size="lg"
-            className="bg-white text-pomodoro hover:bg-white/90 font-semibold px-12 py-6 text-lg rounded-lg shadow-lg transition-all"
+            className="bg-white hover:bg-white/90 font-semibold px-12 py-6 text-lg rounded-lg shadow-lg transition-all"
+            style={{ color: getModeColor() }}
           >
             {isRunning ? (
               <>

@@ -23,6 +23,10 @@ interface TimerContextType {
   startTimer: () => void;
   pauseTimer: () => void;
   resetTimer: () => void;
+  incrementTime: () => void;
+  decrementTime: () => void;
+  setCustomDuration: (mode: TimerMode, minutes: number) => void;
+  getModeDuration: (mode: TimerMode) => number;
   tasks: Task[];
   addTask: (text: string) => void;
   toggleTask: (id: string) => void;
@@ -33,7 +37,7 @@ interface TimerContextType {
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
 
-const MODE_DURATIONS = {
+const DEFAULT_DURATIONS = {
   pomodoro: 45 * 60,
   shortBreak: 5 * 60,
   longBreak: 15 * 60,
@@ -45,10 +49,38 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return (saved as TimerMode) || 'pomodoro';
   });
   
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const saved = localStorage.getItem('timeLeft');
-    return saved ? parseInt(saved) : MODE_DURATIONS.pomodoro;
+  // Separate time for each mode (current countdown)
+  const [modeTimes, setModeTimes] = useState<Record<TimerMode, number>>(() => {
+    const saved = localStorage.getItem('modeTimes');
+    return saved ? JSON.parse(saved) : {
+      pomodoro: DEFAULT_DURATIONS.pomodoro,
+      shortBreak: DEFAULT_DURATIONS.shortBreak,
+      longBreak: DEFAULT_DURATIONS.longBreak,
+    };
   });
+  
+  // Custom durations (what to reset to)
+  // Initialize from modeTimes if customDurations doesn't exist (migration)
+  const [customDurations, setCustomDurations] = useState<Record<TimerMode, number>>(() => {
+    const savedCustom = localStorage.getItem('customDurations');
+    if (savedCustom) {
+      return JSON.parse(savedCustom);
+    }
+    
+    // Migration: use existing modeTimes as custom durations
+    const savedModeTimes = localStorage.getItem('modeTimes');
+    if (savedModeTimes) {
+      return JSON.parse(savedModeTimes);
+    }
+    
+    return {
+      pomodoro: DEFAULT_DURATIONS.pomodoro,
+      shortBreak: DEFAULT_DURATIONS.shortBreak,
+      longBreak: DEFAULT_DURATIONS.longBreak,
+    };
+  });
+  
+  const timeLeft = modeTimes[mode];
   
   const [isRunning, setIsRunning] = useState(false);
   
@@ -68,18 +100,24 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const setMode = useCallback((newMode: TimerMode) => {
+    console.log(`🎨 Switching to ${newMode} mode`);
     setModeState(newMode);
-    setTimeLeft(MODE_DURATIONS[newMode]);
     setIsRunning(false);
     localStorage.setItem('timerMode', newMode);
     
     // Update body class for background color
     document.body.className = `${newMode}-mode`;
-  }, []);
+    console.log(`✅ Body class set to: ${document.body.className}`);
+    console.log(`⏱️ Preserved time for ${newMode}: ${Math.floor(modeTimes[newMode] / 60)}m ${modeTimes[newMode] % 60}s`);
+  }, [modeTimes]);
 
   useEffect(() => {
-    localStorage.setItem('timeLeft', timeLeft.toString());
-  }, [timeLeft]);
+    localStorage.setItem('customDurations', JSON.stringify(customDurations));
+  }, [customDurations]);
+
+  useEffect(() => {
+    localStorage.setItem('modeTimes', JSON.stringify(modeTimes));
+  }, [modeTimes]);
 
   useEffect(() => {
     localStorage.setItem('tasks', JSON.stringify(tasks));
@@ -91,24 +129,62 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     document.body.className = `${mode}-mode`;
+    console.log(`🎨 Initial body class set to: ${document.body.className}`);
   }, [mode]);
+
+  // Update document title with timer
+  useEffect(() => {
+    const formatTime = (seconds: number): string => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const getModeLabel = (mode: TimerMode): string => {
+      switch (mode) {
+        case 'pomodoro':
+          return 'Pomodoro';
+        case 'shortBreak':
+          return 'Short Break';
+        case 'longBreak':
+          return 'Long Break';
+      }
+    };
+
+    const modeLabel = getModeLabel(mode);
+    const timeString = formatTime(timeLeft);
+    
+    if (isRunning) {
+      document.title = `⏱️ ${timeString} - ${modeLabel} | Mindoro`;
+    } else {
+      document.title = `${timeString} - ${modeLabel} | Mindoro`;
+    }
+
+    // Restore default title on unmount
+    return () => {
+      document.title = 'Mindoro';
+    };
+  }, [timeLeft, mode, isRunning]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
     if (isRunning && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
+        setModeTimes((prev) => {
+          const newTime = prev[mode] - 1;
+          
+          if (newTime <= 0) {
             setIsRunning(false);
-            playNotificationSound();
+            playSound('complete');
             // Update streak only for completed pomodoro sessions
             if (mode === 'pomodoro') {
               updateStreak();
             }
-            return 0;
+            return { ...prev, [mode]: 0 };
           }
-          return prev - 1;
+          
+          return { ...prev, [mode]: newTime };
         });
       }, 1000);
     }
@@ -116,13 +192,86 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isRunning, timeLeft]);
+  }, [isRunning, timeLeft, mode]);
 
-  const playNotificationSound = () => {
-    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjaJ0/LRfS0GJ37K8N+UPwsVYbjq7KRTEQlEm9/xwXMfBzWO1fLRgC4HKoHN8uCUPQsVYrfq7KdVFApFnuDyvmwhBjaJ0/LRfS0GJ37K8N+UPwsVYbjq7KRTEQlEm9/xwXMfBzWO1fLRgC4HKoHN8uCUPQsVYrfq7KdVFApFnuDyvmwhBjaJ0/LRfS0GJ37K8N+UPwsVYbjq7KRTEQlEm9/xwXMfBzWO1fLRgC4HKoHN8uCUPQsVYrfq7KdVFApFnuDyvmwhBjaJ0/LRfS0GJ37K8N+UPwsVYbjq7KRTEQlEm9/xwXMfBzWO1fLRgC4HKoHN8uCUPQsVYrfq7KdVFApFnuDyvmwhBjaJ0/LRfS0GJ37K8N+UPwsVYbjq7KRTEQlEm9/xwXMfBzWO1fLRgC4HKoHN8uCUPQ==');
-    audio.play().catch(() => {
-      // Handle autoplay restrictions
-    });
+  const playSound = (type: 'start' | 'pause' | 'reset' | 'complete') => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Different sounds for different actions
+    switch (type) {
+      case 'start':
+        // Ascending beep - exciting start
+        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.15);
+        break;
+        
+      case 'pause':
+        // Descending beep - gentle pause
+        oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(350, audioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.15);
+        break;
+        
+      case 'reset':
+        // Quick double beep
+        oscillator.frequency.setValueAtTime(450, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.05);
+        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + 0.08);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.15);
+        break;
+        
+      case 'complete':
+        // Continuous alarm-like ringing sound (3 seconds)
+        oscillator.type = 'sine';
+        
+        // Repeating alarm pattern: Ring-Ring-Ring (like a phone or alarm)
+        const ringPattern = [
+          { start: 0, end: 0.4, freq: 800 },      // Ring 1
+          { start: 0.5, end: 0.9, freq: 800 },    // Ring 2
+          { start: 1.0, end: 1.4, freq: 800 },    // Ring 3
+          { start: 1.5, end: 1.9, freq: 800 },    // Ring 4
+          { start: 2.0, end: 2.4, freq: 800 },    // Ring 5
+          { start: 2.5, end: 3.0, freq: 800 },    // Ring 6 (final, longer)
+        ];
+        
+        ringPattern.forEach((ring, index) => {
+          const osc = index === 0 ? oscillator : audioContext.createOscillator();
+          const gain = index === 0 ? gainNode : audioContext.createGain();
+          
+          if (index > 0) {
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+          }
+          
+          osc.type = 'sine';
+          osc.frequency.value = ring.freq;
+          
+          // Volume envelope for each ring
+          gain.gain.setValueAtTime(0, audioContext.currentTime + ring.start);
+          gain.gain.linearRampToValueAtTime(0.4, audioContext.currentTime + ring.start + 0.05);
+          gain.gain.setValueAtTime(0.4, audioContext.currentTime + ring.end - 0.05);
+          gain.gain.linearRampToValueAtTime(0, audioContext.currentTime + ring.end);
+          
+          osc.start(audioContext.currentTime + ring.start);
+          osc.stop(audioContext.currentTime + ring.end);
+        });
+        break;
+    }
   };
 
   const updateStreak = useCallback(() => {
@@ -160,16 +309,57 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const startTimer = useCallback(() => {
     setIsRunning(true);
+    playSound('start');
   }, []);
 
   const pauseTimer = useCallback(() => {
     setIsRunning(false);
+    playSound('pause');
   }, []);
 
   const resetTimer = useCallback(() => {
     setIsRunning(false);
-    setTimeLeft(MODE_DURATIONS[mode]);
-  }, [mode]);
+    setModeTimes((prev) => ({
+      ...prev,
+      [mode]: customDurations[mode]
+    }));
+    playSound('reset');
+    console.log(`🔄 Reset ${mode} timer to ${Math.floor(customDurations[mode] / 60)} minutes`);
+  }, [mode, customDurations]);
+
+  const incrementTime = useCallback(() => {
+    if (isRunning) return; // Don't allow changes while running
+    setModeTimes((prev) => ({
+      ...prev,
+      [mode]: prev[mode] + 60 // Add 1 minute
+    }));
+  }, [mode, isRunning]);
+
+  const decrementTime = useCallback(() => {
+    if (isRunning) return; // Don't allow changes while running
+    setModeTimes((prev) => ({
+      ...prev,
+      [mode]: Math.max(60, prev[mode] - 60) // Subtract 1 minute, minimum 1 minute
+    }));
+  }, [mode, isRunning]);
+
+  const setCustomDuration = useCallback((targetMode: TimerMode, minutes: number) => {
+    const seconds = minutes * 60;
+    // Update custom durations (for reset)
+    setCustomDurations((prev) => ({
+      ...prev,
+      [targetMode]: seconds
+    }));
+    // Also update current time for that mode
+    setModeTimes((prev) => ({
+      ...prev,
+      [targetMode]: seconds
+    }));
+  }, []);
+
+  const getModeDuration = useCallback((targetMode: TimerMode) => {
+    return Math.floor(customDurations[targetMode] / 60);
+  }, [customDurations]);
 
   const addTask = useCallback((text: string) => {
     const newTask: Task = {
@@ -202,6 +392,10 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         startTimer,
         pauseTimer,
         resetTimer,
+        incrementTime,
+        decrementTime,
+        setCustomDuration,
+        getModeDuration,
         tasks,
         addTask,
         toggleTask,

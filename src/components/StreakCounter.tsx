@@ -10,7 +10,7 @@ const StreakCounter = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
-      className="w-full max-w-lg mx-auto mt-8"
+      className="w-full lg:min-w-[600px] mt-8"
     >
       <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 shadow-lg">
         <h3 className="text-white font-semibold text-lg mb-4 flex items-center gap-2">
