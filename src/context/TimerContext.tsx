@@ -48,6 +48,37 @@ const DEFAULT_DURATIONS = {
   longBreak: 15 * 60,
 };
 
+function formatTimeForTabTitle(totalMs: number): string {
+  const t = Math.max(0, totalMs) / 1000;
+  const mins = Math.floor(t / 60);
+  const secs = Math.floor(t % 60);
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function getModeLabelForTab(m: TimerMode): string {
+  switch (m) {
+    case 'pomodoro':
+      return 'Pomodoro';
+    case 'shortBreak':
+      return 'Short Break';
+    case 'longBreak':
+      return 'Long Break';
+  }
+}
+
+function truncateForTabTitle(raw: string, maxLen: number): string {
+  const single = raw.replace(/\s+/g, ' ').trim();
+  if (!single) return '';
+  return single.length <= maxLen ? single : `${single.slice(0, maxLen - 1)}…`;
+}
+
+function buildTabTitle(totalMs: number, mode: TimerMode, taskText: string | null | undefined): string {
+  const timeString = formatTimeForTabTitle(totalMs);
+  const taskSnippet = taskText ? truncateForTabTitle(taskText, 42) : '';
+  const taskPart = taskSnippet ? ` · ${taskSnippet}` : '';
+  return `${timeString}${taskPart} - ${getModeLabelForTab(mode)} | Mindoro`;
+}
+
 export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mode, setModeState] = useState<TimerMode>(() => {
     const saved = localStorage.getItem('timerMode');
@@ -130,6 +161,8 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const activeTaskIdRef = useRef<string | null>(activeTaskId);
   const modeRef = useRef(mode);
   const isRunningRef = useRef(isRunning);
+  const tasksRef = useRef<Task[]>(tasks);
+  const lastTabTitleRef = useRef('');
   /** Wall-clock start of the current Pomodoro run segment (after each start / resume / task switch). */
   const focusSegmentStartRef = useRef<number | null>(null);
 
@@ -144,6 +177,10 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     isRunningRef.current = isRunning;
   }, [isRunning]);
+
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   useEffect(() => {
     if (activeTaskId && !tasks.some((t) => t.id === activeTaskId)) {
@@ -373,6 +410,14 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
         return true;
       }
+
+      const tid = activeTaskIdRef.current;
+      const task = tid ? tasksRef.current.find((t) => t.id === tid) : undefined;
+      const nextTitle = buildTabTitle(ms, modeRef.current, task?.text ?? null);
+      if (nextTitle !== lastTabTitleRef.current) {
+        lastTabTitleRef.current = nextTitle;
+        document.title = nextTitle;
+      }
       return false;
     };
 
@@ -388,9 +433,10 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     raf = requestAnimationFrame(tick);
+    // Background tabs throttle RAF; poll a bit faster so the tab title can move each second.
     intervalId = window.setInterval(() => {
-      if (!cancelled) applyTick();
-    }, 1000);
+      if (!cancelled && document.hidden) applyTick();
+    }, 500);
 
     document.addEventListener('visibilitychange', onVisibilityChange);
 
@@ -525,42 +571,22 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [tasks, activeTaskId]
   );
 
-  // Update document title with timer (+ active task when set)
+  // Tab title while paused (running path updates title inside applyTick to avoid resetting
+  // document.title on every React render — that was coalescing updates to ~2s in the tab bar).
   useEffect(() => {
-    const formatTime = (totalMs: number): string => {
-      const t = Math.max(0, totalMs) / 1000;
-      const mins = Math.floor(t / 60);
-      const secs = Math.floor(t % 60);
-      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
+    if (isRunning) return;
+    const next = buildTabTitle(remainingMs, mode, activeTask?.text ?? null);
+    if (next !== lastTabTitleRef.current) {
+      lastTabTitleRef.current = next;
+      document.title = next;
+    }
+  }, [remainingMs, mode, activeTask, isRunning]);
 
-    const getModeLabel = (m: TimerMode): string => {
-      switch (m) {
-        case 'pomodoro':
-          return 'Pomodoro';
-        case 'shortBreak':
-          return 'Short Break';
-        case 'longBreak':
-          return 'Long Break';
-      }
-    };
-
-    const truncateForTitle = (raw: string, maxLen: number): string => {
-      const single = raw.replace(/\s+/g, ' ').trim();
-      if (!single) return '';
-      return single.length <= maxLen ? single : `${single.slice(0, maxLen - 1)}…`;
-    };
-
-    const modeLabel = getModeLabel(mode);
-    const timeString = formatTime(remainingMs);
-    const taskSnippet = activeTask ? truncateForTitle(activeTask.text, 42) : '';
-    const taskPart = taskSnippet ? ` · ${taskSnippet}` : '';
-    document.title = `${timeString}${taskPart} - ${modeLabel} | Mindoro`;
-
+  useEffect(() => {
     return () => {
       document.title = 'Mindoro';
     };
-  }, [remainingMs, mode, activeTask]);
+  }, []);
 
   return (
     <TimerContext.Provider
