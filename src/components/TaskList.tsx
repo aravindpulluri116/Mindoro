@@ -112,7 +112,8 @@ const TaskList = () => {
                     {task.text}
                   </span>
                   <span className="text-white/45 text-xs tabular-nums">
-                    {formatFocusDuration(task.secondsSpent)} on task
+                    {formatFocusDuration(task.secondsSpent)} focus · {formatFocusDuration(task.secondsRest ?? 0)}{' '}
+                    rest
                   </span>
                 </div>
                 <motion.button

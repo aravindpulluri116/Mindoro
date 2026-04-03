@@ -121,12 +121,42 @@ const Timer = () => {
                     ·
                   </span>
                   <span className="text-white/50 tabular-nums shrink-0 whitespace-nowrap">
-                    {formatFocusDuration(activeTask.secondsSpent)} logged
+                    {formatFocusDuration(activeTask.secondsSpent)} focus
                   </span>
                 </div>
               ) : (
                 <p className="text-center text-white/50 text-sm px-2">
                   Tap the target on a to-do to track time on that task.
+                </p>
+              )}
+            </motion.div>
+          )}
+          {(mode === 'shortBreak' || mode === 'longBreak') && (
+            <motion.div
+              key="rest-strip"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={springSoft}
+              className="mb-4"
+            >
+              {activeTask ? (
+                <div className="flex flex-nowrap items-center justify-center gap-2 min-w-0 max-w-full px-2 text-sm text-white/85">
+                  <Target className="size-3.5 shrink-0 text-white/55" aria-hidden />
+                  <span className="text-white/45 shrink-0">Break for</span>
+                  <span className="font-medium text-white truncate min-w-0 flex-1 basis-0 max-w-[10rem] sm:max-w-[14rem] text-center">
+                    {activeTask.text}
+                  </span>
+                  <span className="text-white/35 shrink-0" aria-hidden>
+                    ·
+                  </span>
+                  <span className="text-white/50 tabular-nums shrink-0 whitespace-nowrap">
+                    {formatFocusDuration(activeTask.secondsRest ?? 0)} rest
+                  </span>
+                </div>
+              ) : (
+                <p className="text-center text-white/50 text-sm px-2">
+                  Set a focus task on a to-do to log break time on it.
                 </p>
               )}
             </motion.div>
