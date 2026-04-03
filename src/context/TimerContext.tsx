@@ -349,11 +349,15 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!isRunning) return;
 
     let raf = 0;
+    let intervalId = 0;
     let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
+
+    // Shared tick: RAF is throttled in background tabs, so the interval keeps
+    // remainingMs (and document title) accurate while another tab is focused.
+    const applyTick = (): boolean => {
+      if (cancelled) return true;
       const end = phaseEndAtRef.current;
-      if (end == null) return;
+      if (end == null) return true;
 
       const ms = Math.max(0, end - Date.now());
       setRemainingMs(ms);
@@ -367,16 +371,34 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           flushPomodoroFocusToTask();
           updateStreak();
         }
-        return;
+        return true;
       }
+      return false;
+    };
 
+    const tick = () => {
+      if (cancelled) return;
+      if (applyTick()) return;
       raf = requestAnimationFrame(tick);
     };
 
+    const onVisibilityChange = () => {
+      if (cancelled || document.visibilityState !== 'visible') return;
+      applyTick();
+    };
+
     raf = requestAnimationFrame(tick);
+    intervalId = window.setInterval(() => {
+      if (!cancelled) applyTick();
+    }, 1000);
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [isRunning, mode, flushPomodoroFocusToTask]); // eslint-disable-line react-hooks/exhaustive-deps -- omit updateStreak/playSound
 
