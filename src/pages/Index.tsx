@@ -10,9 +10,9 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col transition-colors duration-500">
       <Navbar />
-      <main className="flex-1 flex flex-col items-stretch px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className="flex-1 flex flex-col items-stretch px-4 sm:px-6 lg:px-10 pt-3 sm:pt-4 lg:pt-5 pb-8 sm:pb-10 lg:pb-12">
         <motion.div
-          className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)_minmax(0,1fr)] gap-6 lg:gap-8 items-start"
+          className="w-full max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,540px)_minmax(0,1fr)] gap-8 lg:gap-10 xl:gap-12 items-start"
           variants={pageContainer}
           initial="hidden"
           animate="show"
@@ -22,7 +22,7 @@ const Index = () => {
           </motion.div>
           <motion.div
             variants={pageSection}
-            className="min-w-0 w-full flex flex-col gap-6 lg:order-2 lg:justify-self-center lg:max-w-[400px]"
+            className="min-w-0 w-full flex flex-col gap-8 lg:gap-10 lg:order-2 lg:justify-self-stretch"
           >
             <Timer />
             <StreakCounter />

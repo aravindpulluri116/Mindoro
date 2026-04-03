@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Link2, ExternalLink, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FloatingShell } from '@/components/FloatingShell';
 import { springSnappy, springSoft } from '@/lib/motion-variants';
 
 const STORAGE_KEY = 'savedLinks';
@@ -56,11 +57,7 @@ const LinksPanel = () => {
 
   return (
     <div className="w-full">
-      <motion.div
-        className="bg-white/10 backdrop-blur-sm rounded-xl p-6 sm:p-8 shadow-lg border border-white/5"
-        whileHover={{ borderColor: 'rgba(255,255,255,0.12)' }}
-        transition={springSoft}
-      >
+      <FloatingShell className="p-6 sm:p-8">
         <div className="flex items-center justify-between gap-3 mb-5">
           <h2 className="text-white font-semibold text-lg sm:text-xl flex items-center gap-2">
             <Link2 className="w-5 h-5 text-white/70" />
@@ -79,7 +76,7 @@ const LinksPanel = () => {
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: -14, scale: 0.98 }}
                 transition={springSoft}
-                className="flex items-center gap-2 rounded-xl p-3 bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/10 group"
+                className="flex items-center gap-2 rounded-xl p-3 bg-white/[0.05] hover:bg-white/[0.09] border border-white/[0.06] hover:border-white/12 shadow-[0_4px_14px_-6px_rgba(0,0,0,0.18)] group"
               >
                 <button
                   type="button"
@@ -181,7 +178,7 @@ const LinksPanel = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </FloatingShell>
     </div>
   );
 };

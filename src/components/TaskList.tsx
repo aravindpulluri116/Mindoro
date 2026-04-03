@@ -5,6 +5,7 @@ import { useTimer, formatFocusDuration } from '@/context/TimerContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FloatingShell } from '@/components/FloatingShell';
 import { springSnappy, springSoft } from '@/lib/motion-variants';
 
 const TaskList = () => {
@@ -35,11 +36,7 @@ const TaskList = () => {
 
   return (
     <div className="w-full">
-      <motion.div
-        className="bg-white/10 backdrop-blur-sm rounded-xl p-6 sm:p-8 shadow-lg border border-white/5"
-        whileHover={{ borderColor: 'rgba(255,255,255,0.12)' }}
-        transition={springSoft}
-      >
+      <FloatingShell className="p-6 sm:p-8">
         <div className="flex items-center justify-between gap-3 mb-5">
           <h2 className="text-white font-semibold text-lg sm:text-xl">To-do</h2>
           <motion.span
@@ -63,10 +60,10 @@ const TaskList = () => {
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 14, scale: 0.98 }}
                 transition={springSoft}
-                className={`flex items-center gap-2 sm:gap-3 bg-white/5 hover:bg-white/10 rounded-xl p-3 border group ${
+                className={`flex items-center gap-2 sm:gap-3 rounded-xl p-3 border group shadow-[0_4px_14px_-6px_rgba(0,0,0,0.18)] bg-white/[0.05] hover:bg-white/[0.09] ${
                   activeTaskId === task.id
-                    ? 'border-white/35 ring-1 ring-white/20 bg-white/[0.08]'
-                    : 'border-transparent hover:border-white/10'
+                    ? 'border-white/35 ring-1 ring-white/15 bg-white/[0.1]'
+                    : 'border-white/[0.06] hover:border-white/12'
                 }`}
               >
                 <Checkbox
@@ -200,7 +197,7 @@ const TaskList = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </FloatingShell>
     </div>
   );
 };

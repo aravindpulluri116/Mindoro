@@ -120,18 +120,73 @@ All colors MUST be HSL.
 
 /* Mode-specific backgrounds - outside @layer for higher specificity */
 body {
-  transition: background-color 0.5s ease;
+  transition: background-color 0.65s cubic-bezier(0.33, 1, 0.68, 1);
   background-color: hsl(4, 60%, 56%); /* Default pomodoro color */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition-duration: 0.01ms;
+  }
 }
 
 body.pomodoro-mode {
   background-color: hsl(4, 60%, 56%) !important; /* Red-orange */
 }
 
+body.pomodoro-mode.timer-running {
+  background-color: hsl(4, 58%, 24%) !important;
+}
+
 body.shortBreak-mode {
   background-color: hsl(195, 70%, 60%) !important; /* Light blue/cyan */
 }
 
+body.shortBreak-mode.timer-running {
+  background-color: hsl(195, 65%, 28%) !important;
+}
+
 body.longBreak-mode {
   background-color: hsl(215, 60%, 48%) !important; /* Darker blue */
+}
+
+body.longBreak-mode.timer-running {
+  background-color: hsl(215, 55%, 22%) !important;
+}
+
+/* Clock glow while session is active (pairs with body.timer-running). */
+.timer-clock-digits {
+  transition: text-shadow 0.65s cubic-bezier(0.33, 1, 0.68, 1);
+  /* Three layers (opaque → transparent) so running glow can interpolate smoothly. */
+  text-shadow:
+    0 0 26px rgba(255, 255, 255, 0),
+    0 0 52px rgba(255, 255, 255, 0),
+    0 0 96px rgba(255, 255, 255, 0);
+}
+
+.timer-clock-digits[data-running='true'][data-timer-mode='pomodoro'] {
+  text-shadow:
+    0 0 26px rgba(255, 255, 255, 0.42),
+    0 0 52px rgba(217, 85, 80, 0.55),
+    0 0 96px rgba(217, 85, 80, 0.28);
+}
+
+.timer-clock-digits[data-running='true'][data-timer-mode='shortBreak'] {
+  text-shadow:
+    0 0 26px rgba(255, 255, 255, 0.38),
+    0 0 52px rgba(105, 206, 229, 0.48),
+    0 0 96px rgba(105, 206, 229, 0.22);
+}
+
+.timer-clock-digits[data-running='true'][data-timer-mode='longBreak'] {
+  text-shadow:
+    0 0 26px rgba(255, 255, 255, 0.38),
+    0 0 52px rgba(85, 119, 192, 0.48),
+    0 0 96px rgba(85, 119, 192, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-clock-digits {
+    transition-duration: 0.01ms;
+  }
 }

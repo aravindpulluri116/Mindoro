@@ -107,7 +107,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 12 }}
               transition={springSoft}
-              className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl max-w-lg w-full p-8 relative z-10 mx-4 border border-white/20"
+              className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-[0_24px_56px_-16px_rgba(0,0,0,0.22)] max-w-lg w-full p-8 relative z-10 mx-4 border border-white/20"
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
@@ -139,7 +139,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                     {activeTab === tab && (
                       <motion.div
                         layoutId="settings-tab-pill"
-                        className="absolute inset-0 rounded-lg bg-white/20 shadow-lg"
+                        className="absolute inset-0 rounded-lg bg-white/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)]"
                         transition={springSnappy}
                       />
                     )}
@@ -223,7 +223,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                   whileTap={{ scale: 0.97 }}
                   transition={springSnappy}
                   onClick={handleSave}
-                  className="flex-1 px-6 py-3 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold transition-colors border border-white/30 shadow-lg"
+                  className="flex-1 px-6 py-3 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold transition-colors border border-white/30 shadow-[0_4px_14px_-4px_rgba(0,0,0,0.12)]"
                 >
                   Save
                 </motion.button>

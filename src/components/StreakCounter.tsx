@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Flame, Trophy, Target } from 'lucide-react';
 import { useTimer } from '@/context/TimerContext';
+import { FloatingShell } from '@/components/FloatingShell';
 import { springSnappy, springSoft, staggerGrid, gridTile } from '@/lib/motion-variants';
 
 const StreakCounter = () => {
@@ -8,11 +9,7 @@ const StreakCounter = () => {
 
   return (
     <div className="w-full">
-      <motion.div
-        className="bg-white/10 backdrop-blur-sm rounded-xl p-6 sm:p-8 shadow-lg border border-white/5"
-        whileHover={{ borderColor: 'rgba(255,255,255,0.12)' }}
-        transition={springSoft}
-      >
+      <FloatingShell className="p-6 sm:p-8">
         <motion.h3
           className="text-white font-semibold text-lg mb-4 flex items-center gap-2"
           initial={{ opacity: 0, x: -8 }}
@@ -39,7 +36,7 @@ const StreakCounter = () => {
             whileHover={{ scale: 1.04, y: -2 }}
             whileTap={{ scale: 0.98 }}
             transition={springSnappy}
-            className="bg-white/5 rounded-xl p-4 text-center border border-white/5"
+            className="bg-white/[0.06] rounded-xl p-4 text-center border border-white/[0.08] shadow-[0_6px_18px_-8px_rgba(0,0,0,0.16)]"
           >
             <div className="flex justify-center mb-2">
               <Flame className="w-6 h-6 text-orange-400" />
@@ -61,7 +58,7 @@ const StreakCounter = () => {
             whileHover={{ scale: 1.04, y: -2 }}
             whileTap={{ scale: 0.98 }}
             transition={springSnappy}
-            className="bg-white/5 rounded-xl p-4 text-center border border-white/5"
+            className="bg-white/[0.06] rounded-xl p-4 text-center border border-white/[0.08] shadow-[0_6px_18px_-8px_rgba(0,0,0,0.16)]"
           >
             <div className="flex justify-center mb-2">
               <Trophy className="w-6 h-6 text-yellow-400" />
@@ -83,7 +80,7 @@ const StreakCounter = () => {
             whileHover={{ scale: 1.04, y: -2 }}
             whileTap={{ scale: 0.98 }}
             transition={springSnappy}
-            className="bg-white/5 rounded-xl p-4 text-center border border-white/5"
+            className="bg-white/[0.06] rounded-xl p-4 text-center border border-white/[0.08] shadow-[0_6px_18px_-8px_rgba(0,0,0,0.16)]"
           >
             <div className="flex justify-center mb-2">
               <Target className="w-6 h-6 text-green-400" />
@@ -121,7 +118,7 @@ const StreakCounter = () => {
               `Legendary ${streak.currentStreak}-day streak! You're a productivity master! 👑`}
           </p>
         </motion.div>
-      </motion.div>
+      </FloatingShell>
     </div>
   );
 };

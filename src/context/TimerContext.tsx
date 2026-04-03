@@ -199,10 +199,6 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setModeState(newMode);
     setIsRunning(false);
     localStorage.setItem('timerMode', newMode);
-    
-    // Update body class for background color
-    document.body.className = `${newMode}-mode`;
-    console.log(`✅ Body class set to: ${document.body.className}`);
     console.log(`⏱️ Preserved time for ${newMode}: ${Math.floor(modeTimes[newMode] / 60)}m ${modeTimes[newMode] % 60}s`);
   }, [modeTimes, flushPomodoroFocusToTask]);
 
@@ -223,9 +219,10 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [streak]);
 
   useEffect(() => {
-    document.body.className = `${mode}-mode`;
-    console.log(`🎨 Initial body class set to: ${document.body.className}`);
-  }, [mode]);
+    const cls = [`${mode}-mode`];
+    if (isRunning) cls.push('timer-running');
+    document.body.className = cls.join(' ');
+  }, [mode, isRunning]);
 
   // When paused, keep millisecond display aligned with stored seconds for this mode.
   useEffect(() => {
@@ -234,41 +231,6 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       phaseEndAtRef.current = null;
     }
   }, [mode, modeTimes, isRunning]);
-
-  // Update document title with timer
-  useEffect(() => {
-    const formatTime = (totalMs: number): string => {
-      const t = Math.max(0, totalMs) / 1000;
-      const mins = Math.floor(t / 60);
-      const secs = Math.floor(t % 60);
-      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const getModeLabel = (mode: TimerMode): string => {
-      switch (mode) {
-        case 'pomodoro':
-          return 'Pomodoro';
-        case 'shortBreak':
-          return 'Short Break';
-        case 'longBreak':
-          return 'Long Break';
-      }
-    };
-
-    const modeLabel = getModeLabel(mode);
-    const timeString = formatTime(remainingMs);
-    
-    if (isRunning) {
-      document.title = `⏱️ ${timeString} - ${modeLabel} | Mindoro`;
-    } else {
-      document.title = `${timeString} - ${modeLabel} | Mindoro`;
-    }
-
-    // Restore default title on unmount
-    return () => {
-      document.title = 'Mindoro';
-    };
-  }, [remainingMs, mode, isRunning]);
 
   const playSound = (type: 'start' | 'pause' | 'reset' | 'complete') => {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -540,6 +502,43 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     () => tasks.find((t) => t.id === activeTaskId) ?? null,
     [tasks, activeTaskId]
   );
+
+  // Update document title with timer (+ active task when set)
+  useEffect(() => {
+    const formatTime = (totalMs: number): string => {
+      const t = Math.max(0, totalMs) / 1000;
+      const mins = Math.floor(t / 60);
+      const secs = Math.floor(t % 60);
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const getModeLabel = (m: TimerMode): string => {
+      switch (m) {
+        case 'pomodoro':
+          return 'Pomodoro';
+        case 'shortBreak':
+          return 'Short Break';
+        case 'longBreak':
+          return 'Long Break';
+      }
+    };
+
+    const truncateForTitle = (raw: string, maxLen: number): string => {
+      const single = raw.replace(/\s+/g, ' ').trim();
+      if (!single) return '';
+      return single.length <= maxLen ? single : `${single.slice(0, maxLen - 1)}…`;
+    };
+
+    const modeLabel = getModeLabel(mode);
+    const timeString = formatTime(remainingMs);
+    const taskSnippet = activeTask ? truncateForTitle(activeTask.text, 42) : '';
+    const taskPart = taskSnippet ? ` · ${taskSnippet}` : '';
+    document.title = `${timeString}${taskPart} - ${modeLabel} | Mindoro`;
+
+    return () => {
+      document.title = 'Mindoro';
+    };
+  }, [remainingMs, mode, activeTask]);
 
   return (
     <TimerContext.Provider

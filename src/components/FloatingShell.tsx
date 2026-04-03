@@ -21,7 +21,7 @@ export function FloatingShell({
     <motion.div
       className={cn(
         'rounded-2xl border border-white/[0.1] bg-white/[0.07] backdrop-blur-2xl',
-        'shadow-[0_16px_48px_-12px_rgba(0,0,0,0.45),0_0_0_1px_rgba(255,255,255,0.05)_inset]',
+        'shadow-[0_12px_36px_-14px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.04)_inset]',
         className
       )}
       whileHover={

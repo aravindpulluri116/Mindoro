@@ -1,9 +1,16 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Play, Pause, RotateCcw, ChevronUp, ChevronDown, Target } from 'lucide-react';
 import { useTimer, TimerMode, formatFocusDuration } from '@/context/TimerContext';
+import { FloatingShell } from '@/components/FloatingShell';
 import { springSnappy, springSoft } from '@/lib/motion-variants';
 
+type StartRipple = { id: number; cx: number; cy: number };
+
 const Timer = () => {
+  const reduceMotion = useReducedMotion();
+  const [startRipple, setStartRipple] = useState<StartRipple | null>(null);
   const {
     mode,
     setMode,
@@ -44,33 +51,51 @@ const Timer = () => {
 
   const modes: TimerMode[] = ['pomodoro', 'shortBreak', 'longBreak'];
 
+  const handlePlayPause = (e: MouseEvent<HTMLButtonElement>) => {
+    if (isRunning) {
+      pauseTimer();
+      return;
+    }
+    if (!reduceMotion) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setStartRipple({
+        id: Date.now(),
+        cx: rect.left + rect.width / 2,
+        cy: rect.top + rect.height / 2,
+      });
+    }
+    startTimer();
+  };
+
   return (
     <div className="w-full">
-      <motion.div
-        className="bg-white/10 backdrop-blur-sm rounded-xl p-6 sm:p-8 shadow-lg border border-white/5"
-        whileHover={{ borderColor: 'rgba(255,255,255,0.12)' }}
-        transition={springSoft}
-      >
-        <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6 justify-center rounded-xl bg-black/15 p-1.5">
+      <FloatingShell className="p-7 sm:p-10 lg:p-12">
+        <div
+          className="flex flex-wrap justify-center gap-0.5 sm:gap-1 mb-5"
+          role="tablist"
+          aria-label="Timer mode"
+        >
           {modes.map((m) => (
             <motion.button
               key={m}
               type="button"
+              role="tab"
+              aria-selected={mode === m}
               onClick={() => setMode(m)}
-              className={`relative px-4 sm:px-6 py-2.5 rounded-lg font-medium text-sm sm:text-base outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-                mode === m ? 'text-white' : 'text-white/65 hover:text-white'
+              className={`relative px-2.5 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium outline-none focus-visible:ring-1 focus-visible:ring-white/35 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent ${
+                mode === m ? 'text-white' : 'text-white/45 hover:text-white/85'
               }`}
-              whileTap={{ scale: 0.97 }}
+              whileTap={{ scale: 0.98 }}
               transition={springSnappy}
             >
               {mode === m && (
                 <motion.div
                   layoutId="timer-mode-pill"
-                  className="absolute inset-0 rounded-lg bg-black/35 shadow-inner"
+                  className="absolute inset-0 rounded-md bg-white/[0.11]"
                   transition={springSnappy}
                 />
               )}
-              <span className="relative z-10">{getModeLabel(m)}</span>
+              <span className="relative z-10 whitespace-nowrap">{getModeLabel(m)}</span>
             </motion.button>
           ))}
         </div>
@@ -108,7 +133,7 @@ const Timer = () => {
           )}
         </AnimatePresence>
 
-        <div className="text-center mb-6 min-h-[6rem] sm:min-h-[7rem] flex flex-col items-center justify-center">
+        <div className="text-center mb-8 min-h-[7.5rem] sm:min-h-[9rem] lg:min-h-[10rem] flex flex-col items-center justify-center">
           <AnimatePresence mode="wait">
             <motion.div
               key={mode}
@@ -118,14 +143,18 @@ const Timer = () => {
               transition={springSoft}
               className="w-full"
             >
-              <div className="font-bold text-white font-poppins tabular-nums tracking-tight text-7xl sm:text-8xl md:text-9xl">
+              <div
+                className="timer-clock-digits font-bold text-white font-poppins tabular-nums tracking-tight leading-none text-8xl sm:text-9xl md:text-[6.5rem] lg:text-[7.25rem] xl:text-[7.75rem]"
+                data-timer-mode={mode}
+                data-running={isRunning ? 'true' : 'false'}
+              >
                 {displayMins.toString().padStart(2, '0')}:{displaySecs.toString().padStart(2, '0')}
               </div>
             </motion.div>
           </AnimatePresence>
 
           <motion.div
-            className="flex items-center justify-center gap-2 mt-4"
+            className="flex items-center justify-center gap-2 mt-5"
             initial={false}
             animate={{ opacity: 1 }}
           >
@@ -156,13 +185,32 @@ const Timer = () => {
           </motion.div>
         </div>
 
-        <div className="flex flex-wrap gap-3 sm:gap-4 justify-center items-center">
+        <div className="flex flex-wrap gap-4 justify-center items-center">
+          {startRipple &&
+            createPortal(
+              <motion.div
+                key={startRipple.id}
+                aria-hidden
+                className="pointer-events-none fixed z-[1000] rounded-full bg-black/28"
+                style={{
+                  left: startRipple.cx,
+                  top: startRipple.cy,
+                  x: '-50%',
+                  y: '-50%',
+                }}
+                initial={{ width: 0, height: 0, opacity: 0.65 }}
+                animate={{ width: '220vmax', height: '220vmax', opacity: 0 }}
+                transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+                onAnimationComplete={() => setStartRipple(null)}
+              />,
+              document.body
+            )}
           <motion.button
             type="button"
-            onClick={isRunning ? pauseTimer : startTimer}
-            className="inline-flex items-center justify-center gap-1.5 bg-white hover:bg-white/92 font-semibold px-7 py-2.5 text-sm rounded-lg shadow-md min-w-[132px]"
+            onClick={handlePlayPause}
+            className="relative z-[1] inline-flex items-center justify-center gap-2 bg-white hover:bg-white/92 font-semibold px-9 py-3 text-base rounded-xl shadow-[0_6px_20px_-6px_rgba(0,0,0,0.15)] min-w-[152px]"
             style={{ color: getModeColor() }}
-            whileHover={{ scale: 1.03, boxShadow: '0 12px 28px rgba(0,0,0,0.18)' }}
+            whileHover={{ scale: 1.03, boxShadow: '0 10px 24px -8px rgba(0,0,0,0.12)' }}
             whileTap={{ scale: 0.97 }}
             transition={springSnappy}
           >
@@ -177,12 +225,12 @@ const Timer = () => {
               >
                 {isRunning ? (
                   <>
-                    <Pause className="w-4 h-4" />
+                    <Pause className="w-5 h-5" />
                     PAUSE
                   </>
                 ) : (
                   <>
-                    <Play className="w-4 h-4" />
+                    <Play className="w-5 h-5" />
                     START
                   </>
                 )}
@@ -196,13 +244,13 @@ const Timer = () => {
             whileTap={{ scale: 0.92 }}
             transition={springSnappy}
             onClick={resetTimer}
-            className="p-2.5 rounded-lg bg-white/10 hover:bg-white/18 text-white border border-white/10"
+            className="p-3 rounded-xl bg-white/10 hover:bg-white/18 text-white border border-white/15"
             aria-label="Reset timer"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-5 h-5" />
           </motion.button>
         </div>
-      </motion.div>
+      </FloatingShell>
     </div>
   );
 };
