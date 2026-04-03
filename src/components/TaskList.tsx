@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Check } from 'lucide-react';
-import { useTimer } from '@/context/TimerContext';
+import { Plus, Trash2, Check, Target } from 'lucide-react';
+import { useTimer, formatFocusDuration } from '@/context/TimerContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { springSnappy, springSoft } from '@/lib/motion-variants';
 
 const TaskList = () => {
-  const { tasks, addTask, toggleTask, deleteTask } = useTimer();
+  const { tasks, addTask, toggleTask, deleteTask, activeTaskId, setActiveTaskId } =
+    useTimer();
   const [isAdding, setIsAdding] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
 
@@ -28,49 +30,101 @@ const TaskList = () => {
     }
   };
 
+  const done = tasks.filter((t) => t.completed).length;
+  const total = tasks.length;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-      className="w-full"
-    >
-      <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 shadow-lg">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-white font-semibold text-xl">Tasks</h2>
-          <span className="text-white/60 text-sm">
-            {tasks.filter(t => t.completed).length} / {tasks.length}
-          </span>
+    <div className="w-full">
+      <motion.div
+        className="bg-white/10 backdrop-blur-sm rounded-xl p-6 sm:p-8 shadow-lg border border-white/5"
+        whileHover={{ borderColor: 'rgba(255,255,255,0.12)' }}
+        transition={springSoft}
+      >
+        <div className="flex items-center justify-between gap-3 mb-5">
+          <h2 className="text-white font-semibold text-lg sm:text-xl">To-do</h2>
+          <motion.span
+            key={`${done}-${total}`}
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={springSnappy}
+            className="text-white/60 text-sm tabular-nums"
+          >
+            {done} / {total}
+          </motion.span>
         </div>
 
-        {/* Task List */}
         <div className="space-y-2 mb-4">
-          <AnimatePresence>
+          <AnimatePresence mode="popLayout" initial={false}>
             {tasks.map((task) => (
               <motion.div
                 key={task.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-lg p-3 transition-all group"
+                layout
+                initial={{ opacity: 0, x: -18, scale: 0.98 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 14, scale: 0.98 }}
+                transition={springSoft}
+                className={`flex items-center gap-2 sm:gap-3 bg-white/5 hover:bg-white/10 rounded-xl p-3 border group ${
+                  activeTaskId === task.id
+                    ? 'border-white/35 ring-1 ring-white/20 bg-white/[0.08]'
+                    : 'border-transparent hover:border-white/10'
+                }`}
               >
                 <Checkbox
                   checked={task.completed}
                   onCheckedChange={() => toggleTask(task.id)}
-                  className="border-white/40 data-[state=checked]:bg-white data-[state=checked]:text-pomodoro"
+                  className="border-white/40 data-[state=checked]:bg-white data-[state=checked]:text-pomodoro shrink-0"
                 />
-                <span
-                  className={`flex-1 text-white ${
-                    task.completed ? 'line-through opacity-60' : ''
-                  }`}
-                >
-                  {task.text}
-                </span>
                 <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  type="button"
+                  disabled={task.completed}
+                  whileHover={task.completed ? {} : { scale: 1.08 }}
+                  whileTap={task.completed ? {} : { scale: 0.92 }}
+                  transition={springSnappy}
+                  onClick={() => {
+                    if (task.completed) return;
+                    setActiveTaskId(activeTaskId === task.id ? null : task.id);
+                  }}
+                  className={`shrink-0 p-2 rounded-lg transition-colors ${
+                    task.completed
+                      ? 'text-white/20 cursor-not-allowed'
+                      : activeTaskId === task.id
+                        ? 'text-white bg-white/15'
+                        : 'text-white/45 hover:text-white hover:bg-white/10'
+                  }`}
+                  title={
+                    task.completed
+                      ? 'Complete tasks cannot be a focus'
+                      : activeTaskId === task.id
+                        ? 'Clear focus'
+                        : 'Track time on this task'
+                  }
+                  aria-label={
+                    activeTaskId === task.id ? 'Clear focus task' : 'Set focus task'
+                  }
+                >
+                  <Target
+                    className={`w-4 h-4 ${activeTaskId === task.id ? 'fill-white/20' : ''}`}
+                  />
+                </motion.button>
+                <div className="flex-1 min-w-0 text-left">
+                  <span
+                    className={`text-white block ${
+                      task.completed ? 'line-through opacity-60' : ''
+                    }`}
+                  >
+                    {task.text}
+                  </span>
+                  <span className="text-white/45 text-xs tabular-nums">
+                    {formatFocusDuration(task.secondsSpent)} on task
+                  </span>
+                </div>
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.12 }}
+                  whileTap={{ scale: 0.88 }}
+                  transition={springSnappy}
                   onClick={() => deleteTask(task.id)}
-                  className="opacity-0 group-hover:opacity-100 p-2 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-all"
+                  className="opacity-0 group-hover:opacity-100 sm:opacity-100 p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-opacity"
                   aria-label="Delete task"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -80,56 +134,74 @@ const TaskList = () => {
           </AnimatePresence>
         </div>
 
-        {/* Add Task Section */}
-        {isAdding ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-2"
-          >
-            <Input
-              autoFocus
-              value={newTaskText}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="What are you working on?"
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white"
-            />
-            <div className="flex gap-2">
-              <Button
-                onClick={handleAddTask}
-                size="sm"
-                className="bg-white text-pomodoro hover:bg-white/90 font-medium"
+        <AnimatePresence mode="wait" initial={false}>
+          {isAdding ? (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={springSoft}
+              className="space-y-2"
+            >
+              <Input
+                autoFocus
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="What are you working on?"
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white rounded-xl"
+              />
+              <div className="flex flex-wrap gap-2">
+                <motion.div whileTap={{ scale: 0.97 }} transition={springSnappy}>
+                  <Button
+                    onClick={handleAddTask}
+                    size="sm"
+                    className="bg-white text-pomodoro hover:bg-white/90 font-medium rounded-lg"
+                  >
+                    <Check className="w-4 h-4 mr-1" />
+                    Add
+                  </Button>
+                </motion.div>
+                <motion.div whileTap={{ scale: 0.97 }} transition={springSnappy}>
+                  <Button
+                    onClick={() => {
+                      setIsAdding(false);
+                      setNewTaskText('');
+                    }}
+                    size="sm"
+                    variant="ghost"
+                    className="text-white hover:bg-white/10 rounded-lg"
+                  >
+                    Cancel
+                  </Button>
+                </motion.div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="add-btn"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={springSoft}
+            >
+              <motion.button
+                type="button"
+                onClick={() => setIsAdding(true)}
+                className="w-full bg-black/20 hover:bg-black/30 text-white border-2 border-dashed border-white/30 font-medium py-6 rounded-xl flex items-center justify-center gap-2"
+                whileHover={{ scale: 1.01, borderColor: 'rgba(255,255,255,0.45)' }}
+                whileTap={{ scale: 0.99 }}
+                transition={springSnappy}
               >
-                <Check className="w-4 h-4 mr-1" />
-                Add
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsAdding(false);
-                  setNewTaskText('');
-                }}
-                size="sm"
-                variant="ghost"
-                className="text-white hover:bg-white/10"
-              >
-                Cancel
-              </Button>
-            </div>
-          </motion.div>
-        ) : (
-          <Button
-            onClick={() => setIsAdding(true)}
-            className="w-full bg-black/20 hover:bg-black/30 text-white border-2 border-dashed border-white/30 font-medium py-6"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Add Task
-          </Button>
-        )}
-
-      </div>
-    </motion.div>
+                <Plus className="w-5 h-5" />
+                Add Task
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
   );
 };
 

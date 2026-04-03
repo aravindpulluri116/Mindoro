@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, ChevronUp, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTimer, TimerMode } from '@/context/TimerContext';
+import { springSoft, springSnappy } from '@/lib/motion-variants';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -102,46 +103,60 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
             {/* Modal */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white/10 backdrop-blur-lg rounded-lg shadow-2xl max-w-lg w-full p-8 relative z-10 mx-4 border border-white/20"
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              transition={springSoft}
+              className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl max-w-lg w-full p-8 relative z-10 mx-4 border border-white/20"
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-white">Timer Settings</h2>
                 <motion.button
-                  whileHover={{ scale: 1.1 }}
+                  whileHover={{ scale: 1.08, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
+                  transition={springSnappy}
                   onClick={onClose}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
                 >
                   <X className="w-5 h-5 text-white" />
                 </motion.button>
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-2 mb-6 bg-black/20 p-1 rounded-lg">
+              <div className="flex gap-1 mb-6 bg-black/25 p-1 rounded-xl">
                 {(['pomodoro', 'shortBreak', 'longBreak'] as SettingsTab[]).map((tab) => (
                   <motion.button
                     key={tab}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    whileTap={{ scale: 0.97 }}
+                    transition={springSnappy}
                     onClick={() => setActiveTab(tab)}
-                    className={`flex-1 py-2 px-3 rounded-md font-medium transition-all text-sm ${
-                      activeTab === tab
-                        ? 'bg-white/20 text-white shadow-lg'
-                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    className={`relative flex-1 py-2.5 px-2 sm:px-3 rounded-lg font-medium text-xs sm:text-sm outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                      activeTab === tab ? 'text-white' : 'text-white/65 hover:text-white'
                     }`}
                   >
-                    {getTabLabel(tab)}
+                    {activeTab === tab && (
+                      <motion.div
+                        layoutId="settings-tab-pill"
+                        className="absolute inset-0 rounded-lg bg-white/20 shadow-lg"
+                        transition={springSnappy}
+                      />
+                    )}
+                    <span className="relative z-10">{getTabLabel(tab)}</span>
                   </motion.button>
                 ))}
               </div>
 
-              {/* Time Input */}
-              <div className="mb-6">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={springSoft}
+                  className="mb-6"
+                >
                 <label className="block text-sm font-medium text-white/90 mb-3 text-center">
                   Time (minutes)
                 </label>
@@ -169,7 +184,6 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                         setCurrentTime(value);
                       }
                     }}
-                    onFocus={(e) => e.target.select()}
                     className="flex-1 px-4 py-3 text-center text-4xl font-bold text-white bg-white/10 border-2 border-white/30 rounded-lg focus:ring-2 focus:ring-white/50 focus:border-white/50 outline-none cursor-text min-w-0 placeholder-white/30"
                     placeholder="0"
                     autoComplete="off"
@@ -188,23 +202,28 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 <p className="text-xs text-white/60 text-center mt-3">
                   Enter any duration (minimum 1 minute)
                 </p>
-              </div>
+                </motion.div>
+              </AnimatePresence>
 
               {/* Footer */}
               <div className="flex gap-3">
                 <motion.button
+                  type="button"
                   whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSnappy}
                   onClick={onClose}
-                  className="flex-1 px-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium transition-all border border-white/20"
+                  className="flex-1 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors border border-white/20"
                 >
                   Cancel
                 </motion.button>
                 <motion.button
+                  type="button"
                   whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSnappy}
                   onClick={handleSave}
-                  className="flex-1 px-6 py-3 rounded-lg bg-white/20 hover:bg-white/30 text-white font-semibold transition-all border border-white/30 shadow-lg"
+                  className="flex-1 px-6 py-3 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold transition-colors border border-white/30 shadow-lg"
                 >
                   Save
                 </motion.button>

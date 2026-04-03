@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 export type TimerMode = 'pomodoro' | 'shortBreak' | 'longBreak';
 
@@ -6,6 +6,8 @@ export interface Task {
   id: string;
   text: string;
   completed: boolean;
+  /** Total seconds logged on this task while in Pomodoro with this task selected. */
+  secondsSpent: number;
 }
 
 export interface StreakData {
@@ -28,6 +30,9 @@ interface TimerContextType {
   setCustomDuration: (mode: TimerMode, minutes: number) => void;
   getModeDuration: (mode: TimerMode) => number;
   tasks: Task[];
+  activeTaskId: string | null;
+  setActiveTaskId: (id: string | null) => void;
+  activeTask: Task | null;
   addTask: (text: string) => void;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
@@ -79,15 +84,100 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       longBreak: DEFAULT_DURATIONS.longBreak,
     };
   });
-  
-  const timeLeft = modeTimes[mode];
-  
+
+  const [remainingMs, setRemainingMs] = useState(() => {
+    try {
+      const savedTimes = localStorage.getItem('modeTimes');
+      const savedMode = (localStorage.getItem('timerMode') as TimerMode) || 'pomodoro';
+      const times = savedTimes ? JSON.parse(savedTimes) : DEFAULT_DURATIONS;
+      const sec = times[savedMode] ?? DEFAULT_DURATIONS.pomodoro;
+      return sec * 1000;
+    } catch {
+      return DEFAULT_DURATIONS.pomodoro * 1000;
+    }
+  });
+
+  const phaseEndAtRef = useRef<number | null>(null);
+  const remainingMsRef = useRef(0);
+
   const [isRunning, setIsRunning] = useState(false);
+
+  remainingMsRef.current = remainingMs;
+  const timeLeft = Math.max(0, Math.floor(remainingMs / 1000));
   
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('tasks');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved) as Task[];
+      return parsed.map((t) => ({
+        ...t,
+        secondsSpent: typeof t.secondsSpent === 'number' ? t.secondsSpent : 0,
+      }));
+    } catch {
+      return [];
+    }
   });
+
+  const [activeTaskId, setActiveTaskIdState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('activeTaskId');
+    } catch {
+      return null;
+    }
+  });
+
+  const activeTaskIdRef = useRef<string | null>(activeTaskId);
+  const modeRef = useRef(mode);
+  const isRunningRef = useRef(isRunning);
+  /** Wall-clock start of the current Pomodoro run segment (after each start / resume / task switch). */
+  const focusSegmentStartRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    activeTaskIdRef.current = activeTaskId;
+  }, [activeTaskId]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    isRunningRef.current = isRunning;
+  }, [isRunning]);
+
+  useEffect(() => {
+    if (activeTaskId && !tasks.some((t) => t.id === activeTaskId)) {
+      setActiveTaskIdState(null);
+      localStorage.removeItem('activeTaskId');
+    }
+  }, [tasks, activeTaskId]);
+
+  const flushPomodoroFocusToTask = useCallback(() => {
+    const id = activeTaskIdRef.current;
+    const start = focusSegmentStartRef.current;
+    focusSegmentStartRef.current = null;
+    if (!id || start == null) return;
+    const deltaSec = Math.max(0, Math.round((Date.now() - start) / 1000));
+    if (deltaSec === 0) return;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, secondsSpent: (t.secondsSpent ?? 0) + deltaSec } : t
+      )
+    );
+  }, []);
+
+  const setActiveTaskId = useCallback(
+    (id: string | null) => {
+      if (isRunningRef.current && modeRef.current === 'pomodoro') {
+        flushPomodoroFocusToTask();
+        focusSegmentStartRef.current = Date.now();
+      }
+      setActiveTaskIdState(id);
+      if (id) localStorage.setItem('activeTaskId', id);
+      else localStorage.removeItem('activeTaskId');
+    },
+    [flushPomodoroFocusToTask]
+  );
 
   const [streak, setStreak] = useState<StreakData>(() => {
     const saved = localStorage.getItem('streak');
@@ -100,6 +190,11 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const setMode = useCallback((newMode: TimerMode) => {
+    if (isRunningRef.current && modeRef.current === 'pomodoro') {
+      flushPomodoroFocusToTask();
+    } else {
+      focusSegmentStartRef.current = null;
+    }
     console.log(`🎨 Switching to ${newMode} mode`);
     setModeState(newMode);
     setIsRunning(false);
@@ -109,7 +204,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     document.body.className = `${newMode}-mode`;
     console.log(`✅ Body class set to: ${document.body.className}`);
     console.log(`⏱️ Preserved time for ${newMode}: ${Math.floor(modeTimes[newMode] / 60)}m ${modeTimes[newMode] % 60}s`);
-  }, [modeTimes]);
+  }, [modeTimes, flushPomodoroFocusToTask]);
 
   useEffect(() => {
     localStorage.setItem('customDurations', JSON.stringify(customDurations));
@@ -132,11 +227,20 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     console.log(`🎨 Initial body class set to: ${document.body.className}`);
   }, [mode]);
 
+  // When paused, keep millisecond display aligned with stored seconds for this mode.
+  useEffect(() => {
+    if (!isRunning) {
+      setRemainingMs(modeTimes[mode] * 1000);
+      phaseEndAtRef.current = null;
+    }
+  }, [mode, modeTimes, isRunning]);
+
   // Update document title with timer
   useEffect(() => {
-    const formatTime = (seconds: number): string => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
+    const formatTime = (totalMs: number): string => {
+      const t = Math.max(0, totalMs) / 1000;
+      const mins = Math.floor(t / 60);
+      const secs = Math.floor(t % 60);
       return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
@@ -152,7 +256,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const modeLabel = getModeLabel(mode);
-    const timeString = formatTime(timeLeft);
+    const timeString = formatTime(remainingMs);
     
     if (isRunning) {
       document.title = `⏱️ ${timeString} - ${modeLabel} | Mindoro`;
@@ -164,35 +268,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       document.title = 'Mindoro';
     };
-  }, [timeLeft, mode, isRunning]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (isRunning && timeLeft > 0) {
-      interval = setInterval(() => {
-        setModeTimes((prev) => {
-          const newTime = prev[mode] - 1;
-          
-          if (newTime <= 0) {
-            setIsRunning(false);
-            playSound('complete');
-            // Update streak only for completed pomodoro sessions
-            if (mode === 'pomodoro') {
-              updateStreak();
-            }
-            return { ...prev, [mode]: 0 };
-          }
-          
-          return { ...prev, [mode]: newTime };
-        });
-      }, 1000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRunning, timeLeft, mode]);
+  }, [remainingMs, mode, isRunning]);
 
   const playSound = (type: 'start' | 'pause' | 'reset' | 'complete') => {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -307,17 +383,74 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setStreak(newStreakData);
   }, [streak]);
 
+  useEffect(() => {
+    if (!isRunning) return;
+
+    let raf = 0;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      const end = phaseEndAtRef.current;
+      if (end == null) return;
+
+      const ms = Math.max(0, end - Date.now());
+      setRemainingMs(ms);
+
+      if (ms <= 0) {
+        phaseEndAtRef.current = null;
+        setIsRunning(false);
+        setModeTimes((prev) => ({ ...prev, [mode]: 0 }));
+        playSound('complete');
+        if (mode === 'pomodoro') {
+          flushPomodoroFocusToTask();
+          updateStreak();
+        }
+        return;
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [isRunning, mode, flushPomodoroFocusToTask]); // eslint-disable-line react-hooks/exhaustive-deps -- omit updateStreak/playSound
+
   const startTimer = useCallback(() => {
+    const ms = remainingMsRef.current;
+    phaseEndAtRef.current = Date.now() + ms;
+    if (modeRef.current === 'pomodoro') {
+      focusSegmentStartRef.current = Date.now();
+    } else {
+      focusSegmentStartRef.current = null;
+    }
     setIsRunning(true);
     playSound('start');
   }, []);
 
   const pauseTimer = useCallback(() => {
+    if (mode === 'pomodoro') {
+      flushPomodoroFocusToTask();
+    }
+    const end = phaseEndAtRef.current;
+    if (end != null) {
+      const ms = Math.max(0, end - Date.now());
+      const secondsSnapshot = Math.max(0, Math.round(ms / 1000));
+      setModeTimes((prev) => ({ ...prev, [mode]: secondsSnapshot }));
+      setRemainingMs(secondsSnapshot * 1000);
+    }
+    phaseEndAtRef.current = null;
     setIsRunning(false);
     playSound('pause');
-  }, []);
+  }, [mode, flushPomodoroFocusToTask]);
 
   const resetTimer = useCallback(() => {
+    if (isRunning && mode === 'pomodoro') {
+      flushPomodoroFocusToTask();
+    }
+    focusSegmentStartRef.current = null;
     setIsRunning(false);
     setModeTimes((prev) => ({
       ...prev,
@@ -325,7 +458,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
     playSound('reset');
     console.log(`🔄 Reset ${mode} timer to ${Math.floor(customDurations[mode] / 60)} minutes`);
-  }, [mode, customDurations]);
+  }, [mode, customDurations, isRunning, flushPomodoroFocusToTask]);
 
   const incrementTime = useCallback(() => {
     if (isRunning) return; // Don't allow changes while running
@@ -366,21 +499,47 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: Date.now().toString(),
       text,
       completed: false,
+      secondsSpent: 0,
     };
     setTasks((prev) => [...prev, newTask]);
   }, []);
 
-  const toggleTask = useCallback((id: string) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
-  }, []);
+  const toggleTask = useCallback(
+    (id: string) => {
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return;
+      const willComplete = !task.completed;
+      if (
+        willComplete &&
+        activeTaskId === id &&
+        isRunning &&
+        mode === 'pomodoro'
+      ) {
+        flushPomodoroFocusToTask();
+      }
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+      );
+      if (willComplete && activeTaskId === id) {
+        setActiveTaskIdState(null);
+        localStorage.removeItem('activeTaskId');
+      }
+    },
+    [tasks, activeTaskId, isRunning, mode, flushPomodoroFocusToTask]
+  );
 
   const deleteTask = useCallback((id: string) => {
     setTasks((prev) => prev.filter((task) => task.id !== id));
+    if (activeTaskIdRef.current === id) {
+      setActiveTaskIdState(null);
+      localStorage.removeItem('activeTaskId');
+    }
   }, []);
+
+  const activeTask = useMemo(
+    () => tasks.find((t) => t.id === activeTaskId) ?? null,
+    [tasks, activeTaskId]
+  );
 
   return (
     <TimerContext.Provider
@@ -397,6 +556,9 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCustomDuration,
         getModeDuration,
         tasks,
+        activeTaskId,
+        setActiveTaskId,
+        activeTask,
         addTask,
         toggleTask,
         deleteTask,
@@ -416,3 +578,18 @@ export const useTimer = () => {
   }
   return context;
 };
+
+/** Human-readable logged focus time for a task. */
+export function formatFocusDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  if (s < 60) return s === 0 ? '0s' : `${s}s`;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) {
+    if (m === 0 && r === 0) return `${h}h`;
+    if (r === 0) return `${h}h ${m}m`;
+    return `${h}h ${m}m ${r}s`;
+  }
+  return r === 0 ? `${m}m` : `${m}m ${r}s`;
+}
